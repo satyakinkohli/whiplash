@@ -1,0 +1,4 @@
+# Snapshot fixtures live here.
+# tests/fixtures/<source>-<YYYY-MM-DD>.html (or .json for api sources)
+# Each source's parser test should run against the latest fixture so layout
+# changes fail in CI.

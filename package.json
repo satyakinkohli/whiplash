@@ -1,0 +1,40 @@
+{
+  "name": "whiplash",
+  "version": "0.0.1",
+  "description": "Concert and festival ingestion pipeline for India",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.5.0",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint . --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ingest": "tsx src/runner.ts",
+    "ingest:source": "tsx src/runner.ts --source",
+    "digest": "tsx src/runner.ts --digest-only",
+    "migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.3",
+    "@supabase/supabase-js": "^2.45.4",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.47.2",
+    "resend": "^4.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.10",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}
