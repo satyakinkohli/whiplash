@@ -169,9 +169,11 @@ function narrowToListings(html: string): string {
 }
 
 /**
- * Selector-based parse. RSI has used at least two layouts historically:
- *   - Plain <p> blocks with <strong>artist</strong> followed by date/venue.
+ * Selector-based parse. RSI has used at least three layouts historically:
+ *   - GigPress plugin (current, 2026-04): one <tr> per event with 4 <td>:
+ *     date | artist | city | venue, then a sibling <tr> with the Buy Tickets <a>.
  *   - Tables / WP gig-calendar plugin output with .gig-row, .gig-date classes.
+ *   - Plain <p> blocks with <strong>artist</strong> followed by date/venue.
  *
  * We try each profile and use whichever yields ≥1 row. When RSI changes
  * layout, the LLM fallback kicks in and we add a new profile here.
@@ -179,8 +181,54 @@ function narrowToListings(html: string): string {
 function parseWithSelectors(html: string, ctx: SourceContext): ParsedRow[] {
   const $ = cheerio.load(html);
 
+  // e.g. "April 24th, 2026" or "May 7th, 2026 - May 9th, 2026"
+  const RSI_DATE_RE =
+    /^\s*([A-Z][a-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})(?:\s*[-–]\s*([A-Z][a-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}))?\s*$/;
+
   const profiles: Array<() => ParsedRow[]> = [
-    // Profile A: gig-row / gig-date class pattern
+    // Profile A: GigPress table layout (current as of 2026-04).
+    // <tr><td>date</td><td>artist</td><td>city</td><td>venue</td></tr>
+    // followed by a sibling <tr> containing the Buy Tickets <a>.
+    () => {
+      const rows: ParsedRow[] = [];
+      $('tr').each((_, el) => {
+        const $el = $(el);
+        const cells = $el.find('td');
+        if (cells.length < 4) return;
+
+        const dateText = $(cells[0]).text().trim();
+        const m = dateText.match(RSI_DATE_RE);
+        if (!m) return; // skip header / separator / buy-ticket rows
+
+        const artist = $(cells[1]).text().trim();
+        const city = $(cells[2]).text().trim();
+        const venue = $(cells[3]).text().trim();
+        if (!artist || !city || !venue) return;
+
+        // Buy Tickets link sits in the next <tr> (or sometimes inline).
+        const $next = $el.next('tr');
+        const ticketUrl =
+          $next.find('a[href]').first().attr('href') ??
+          $el.find('a[href]').first().attr('href') ??
+          null;
+
+        rows.push({
+          artist,
+          venue,
+          city,
+          date: m[1]!,
+          end_date: m[2] ?? null,
+          ticket_url: ticketUrl,
+          type: 'concert',
+          genre_hint: null,
+          confidence: 1,
+          raw_snippet: $.html(el).slice(0, 500),
+        });
+      });
+      return rows;
+    },
+
+    // Profile B: gig-row / gig-date class pattern (legacy RSI).
     () => {
       const rows: ParsedRow[] = [];
       $('.gig-row, [class*="gig-row"]').each((_, el) => {
@@ -207,7 +255,7 @@ function parseWithSelectors(html: string, ctx: SourceContext): ParsedRow[] {
       return rows;
     },
 
-    // Profile B: <strong>Artist</strong> followed by date/venue text
+    // Profile C: <strong>Artist</strong> followed by date/venue text (legacy RSI).
     () => {
       const rows: ParsedRow[] = [];
       $('p').each((_, el) => {
